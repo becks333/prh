@@ -82,7 +82,7 @@
   }
 
   async function refreshWallet() {
-    if (!currentUser) return;
+    if (!currentUser) return false;
     setStatus(walletStatus, 'Refreshing wallet…');
     const [profileResult, requestResult, adminResult] = await Promise.all([
       client.from('profiles').select('email, display_name, balance').eq('user_id', currentUser.id).single(),
@@ -92,11 +92,11 @@
 
     if (profileResult.error) {
       setStatus(walletStatus, `Could not load your wallet: ${profileResult.error.message}`, 'error');
-      return;
+      return false;
     }
     if (requestResult.error) {
       setStatus(walletStatus, `Could not load your requests: ${requestResult.error.message}`, 'error');
-      return;
+      return false;
     }
 
     const profile = profileResult.data;
@@ -105,7 +105,12 @@
     document.getElementById('cloudUserEmail').textContent = profile.email || currentUser.email || '';
     document.getElementById('cloudAdminLink').hidden = adminResult.error || adminResult.data !== true;
     renderRequests(requestResult.data || []);
-    setStatus(walletStatus, '');
+    if (adminResult.error) {
+      setStatus(walletStatus, `Could not verify administrator access: ${adminResult.error.message}`, 'error');
+    } else {
+      setStatus(walletStatus, '');
+    }
+    return true;
   }
 
   async function renderSession(session) {
@@ -178,15 +183,19 @@
       return;
     }
     form.reset();
-    await refreshWallet();
+    if (!await refreshWallet()) return;
     setStatus(walletStatus, 'Request submitted. Your balance changes after admin approval.', 'success');
   }
 
   document.getElementById('cloudDepositForm').addEventListener('submit', submitWalletRequest);
   document.getElementById('cloudWithdrawalForm').addEventListener('submit', submitWalletRequest);
   document.getElementById('cloudRefreshRequests').addEventListener('click', refreshWallet);
-  document.getElementById('cloudSignOut').addEventListener('click', () => client.auth.signOut());
-  document.getElementById('cloudMobileSignOut').addEventListener('click', () => client.auth.signOut());
+  async function signOut() {
+    const { error } = await client.auth.signOut();
+    if (error) setStatus(currentUser ? walletStatus : authStatus, error.message, 'error');
+  }
+  document.getElementById('cloudSignOut').addEventListener('click', signOut);
+  document.getElementById('cloudMobileSignOut').addEventListener('click', signOut);
 
   client.auth.onAuthStateChange((_event, session) => {
     window.setTimeout(() => renderSession(session), 0);

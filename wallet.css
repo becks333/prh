@@ -24,8 +24,6 @@ body.supabase-wallet {
   font-family: "DM Sans", "Avenir Next", sans-serif;
 }
 
-body.supabase-wallet > :not(#cloudWalletRoot) { display: none !important; }
-
 #cloudWalletRoot {
   min-height: 100vh;
   display: flex;
